@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EFL Vocabulary Showdown PRO</title>
+    <style>
+        :root { --primary: #4a90e2; --secondary: #f5a623; --success: #48bb78; --danger: #f56565; --dark: #1a202c; --light: #f7fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a202c; color: var(--light); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-y: auto; padding-bottom: 50px; }
+        
+        #game-header { text-align: center; padding: 15px; width: 100%; background: rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 100; border-bottom: 2px solid var(--primary); }
+        #turn-display { font-size: 1.5rem; font-weight: bold; color: var(--secondary); text-transform: uppercase; padding: 10px 30px; border: 3px solid var(--secondary); display: inline-block; border-radius: 50px; background: #000; box-shadow: 0 0 15px var(--secondary); }
+        #round-indicator { margin-top: 5px; color: var(--primary); font-weight: bold; }
+
+        #scoreboard { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 15px 0; width: 95%; }
+        .team-box { background: #2d3748; padding: 10px; border-radius: 12px; flex: 1; min-width: 140px; max-width: 200px; text-align: center; border: 4px solid transparent; transition: 0.3s; }
+        .team-box.active { border-color: var(--secondary); transform: scale(1.1); background: #4a5568; }
+        .score { font-size: 2.2rem; font-weight: 800; color: var(--primary); }
+
+        #grid-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 1000px; width: 95%; margin-top: 10px; }
+        .cat-title { text-align: center; font-weight: bold; padding: 12px 5px; background: var(--primary); border-radius: 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .cell { aspect-ratio: 16/10; background: linear-gradient(145deg, #4a5568, #2d3748); display: flex; justify-content: center; align-items: center; font-size: 2rem; font-weight: bold; cursor: pointer; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); color: var(--secondary); transition: 0.2s; }
+        .cell:hover:not(.disabled) { background: var(--secondary); color: white; transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .cell.disabled { opacity: 0.1; cursor: not-allowed; filter: grayscale(1); }
+
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 500; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        #question-header { color: var(--secondary); font-size: 1.2rem; margin-bottom: 10px; text-transform: uppercase; }
+        #question-text { font-size: 2.5rem; text-align: center; margin-bottom: 40px; max-width: 850px; color: white; font-weight: bold; }
+        
+        #options-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; width: 100%; max-width: 800px; }
+        .option-btn { background: #2d3748; border: 3px solid var(--primary); color: white; padding: 25px; font-size: 1.6rem; cursor: pointer; border-radius: 15px; transition: 0.2s; }
+        .option-btn:hover { background: var(--primary); }
+        .option-btn.correct { background: var(--success) !important; border-color: white; transform: scale(1.05); }
+        .option-btn.wrong { background: var(--danger) !important; border-color: white; opacity: 0.5; }
+
+        .balloon-wrap { position: fixed; bottom: -200px; z-index: 1000; animation: floatUp 4s linear forwards; pointer-events: none; }
+        .balloon-body { width: 70px; height: 90px; border-radius: 50% 50% 50% 50% / 45% 45% 55% 55%; position: relative; }
+        .balloon-string { position: absolute; top: 88px; left: 50%; width: 2px; height: 120px; background: rgba(255,255,255,0.6); transform: translateX(-50%); }
+        @keyframes floatUp { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(-160vh) rotate(15deg); } }
+
+        #result-banner { font-size: 6rem; font-weight: 900; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1100; display: none; text-shadow: 0 0 40px black; text-align: center; width: 100%; line-height: 1.1; }
+    </style>
+</head>
+<body>
+    <div id="game-header">
+        <div id="turn-display">Team 1's Turn</div>
+        <div id="round-indicator">ROUND 1</div>
+    </div>
+
+    <div id="scoreboard">
+        <div class="team-box active" id="team-box-0"><div class="team-label" contenteditable="true">TEAM 1</div><div class="score" id="score-0">0</div></div>
+        <div class="team-box" id="team-box-1"><div class="team-label" contenteditable="true">TEAM 2</div><div class="score" id="score-1">0</div></div>
+        <div class="team-box" id="team-box-2"><div class="team-label" contenteditable="true">TEAM 3</div><div class="score" id="score-2">0</div></div>
+        <div class="team-box" id="team-box-3"><div class="team-label" contenteditable="true">TEAM 4</div><div class="score" id="score-3">0</div></div>
+    </div>
+
+    <div id="grid-container">
+        <div class="cat-title">A</div><div class="cat-title">B</div><div class="cat-title">C</div><div class="cat-title">D</div><div class="cat-title">E</div>
+    </div>
+
+    <div id="overlay">
+        <div id="question-header"></div>
+        <div id="question-text"></div>
+        <div id="options-grid"></div>
+    </div>
+
+    <div id="result-banner"></div>
+
+    <script>
+        const fullWordPool = [
+            { w: "dangerous", h: "מסוכן", d: "Likely to cause harm", s: "⚠️", f: "It's ___ to cross the street without looking." },
+            { w: "various", h: "מגוון", d: "Many different types", s: "🎨", f: "There are ___ ways to solve this problem." },
+            { w: "terrible", h: "נורא", d: "Extremely bad", s: "😫", f: "I had a ___ headache all day." },
+            { w: "foreign", h: "זר", d: "From another country", s: "✈️", f: "Learning a ___ language takes time." },
+            { w: "suitable", h: "מתאים", d: "Right for a purpose", s: "✅", f: "This movie is not ___ for children." },
+            { w: "polite", h: "מנומס", d: "Having good manners", s: "🤝", f: "He gave a ___ answer to the teacher." },
+            { w: "absent", h: "נעדר", d: "Not present", s: "👻", f: "Why were you ___ from class yesterday?" },
+            { w: "blind", h: "עיוור", d: "Unable to see", s: "🕶️", f: "A ___ person often uses a white cane." },
+            { w: "serious", h: "רציני", d: "Not joking; important", s: "🧐", f: "Global warming is a ___ problem." },
+            { w: "continue", h: "להמשיך", d: "Keep doing something", s: "➡️", f: "The rain will ___ until tomorrow." },
+            { w: "divide", h: "לחלק", d: "Separate into parts", s: "➗", f: "Please ___ the cake into eight pieces." },
+            { w: "author", h: "סופר", d: "Person who writes books", s: "✍️", f: "Who is your favorite ___?" },
+            { w: "literature", h: "ספרות", d: "Written works/books", s: "📚", f: "We study English ___ on Mondays." },
+            { w: "error", h: "טעות", d: "A mistake", s: "❌", f: "There was a small ___ in the report." },
+            { w: "software", h: "תוכנה", d: "Computer programs", s: "💿", f: "My computer needs a ___ update." },
+            { w: "originally", h: "במקור", d: "At the beginning", s: "👶", f: "The house was ___ a small school." },
+            { w: "advantage", h: "יתרון", d: "A helpful feature", s: "📈", f: "Speed is a great ___ in a race." },
+            { w: "unnecessary", h: "מיותר", d: "Not needed", s: "🚫", f: "Please don't take ___ risks." },
+            { w: "communicate", h: "לתקשר", d: "Exchange info", s: "📱", f: "Whales ___ using deep sounds." },
+            { w: "freeze", h: "לקפוא", d: "Turn into ice", s: "❄️", f: "Water will ___ at 0 degrees." },
+            { w: "violence", h: "אלימות", d: "Physical force to hurt", s: "👊", f: "The movie was criticized for its ___." },
+            { w: "distance", h: "מרחק", d: "Space between two points", s: "📏", f: "What is the ___ to the moon?" },
+            { w: "confident", h: "בטוח בעצמו", d: "Feeling sure", s: "🦁", f: "She is ___ that she will win." },
+            { w: "employ", h: "להעסיק", d: "Give a job to", s: "💼", f: "The factory will ___ 200 workers." },
+            { w: "remind", h: "להזכיר", d: "Help to remember", s: "🔔", f: "Please ___ me to call my mom." },
+            { w: "attitude", h: "גישה", d: "Way of thinking", s: "🤔", f: "A positive ___ helps you succeed." },
+            { w: "join", h: "להצטרף", d: "Become a member", s: "➕", f: "I want to ___ the basketball team." },
+            { w: "broken", h: "שבור", d: "Damaged/Not working", s: "💔", f: "My watch is ___." },
+            { w: "butterfly", h: "פרפר", d: "Winged insect", s: "🦋", f: "The ___ flew over the flowers." },
+            { w: "relatively", h: "באופן יחסי", d: "Compared to others", s: "⚖️", f: "The exam was ___ easy." }
+        ];
+
+        let currentTeam = 0, currentRound = 1, boxesInRound = 0, isProcessing = false;
+        let availableForCorrect = [...fullWordPool];
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.connect(g); g.connect(audioCtx.destination);
+            if(type === 'win') { osc.frequency.setValueAtTime(500, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.3); }
+            else { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3); }
+            g.gain.setValueAtTime(0.1, audioCtx.currentTime); g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function spawnBalloons(count = 15) {
+            const colors = ['#ff5e5e', '#5eff8b', '#5e99ff', '#ffeb5e', '#ff5ef4'];
+            for(let i=0; i<count; i++) {
+                setTimeout(() => {
+                    const wrap = document.createElement('div'); wrap.className = 'balloon-wrap';
+                    wrap.style.left = Math.random()*95 + 'vw';
+                    const body = document.createElement('div'); body.className = 'balloon-body';
+                    body.style.backgroundColor = colors[Math.floor(Math.random()*5)];
+                    const string = document.createElement('div'); string.className = 'balloon-string';
+                    wrap.appendChild(body); wrap.appendChild(string); document.body.appendChild(wrap);
+                    setTimeout(() => wrap.remove(), 4000);
+                }, i * 150);
+            }
+        }
+
+        function initGrid() {
+            const grid = document.getElementById('grid-container');
+            const existingCells = document.querySelectorAll('.cell');
+            existingCells.forEach(c => c.remove());
+            boxesInRound = 0;
+            availableForCorrect = [...fullWordPool]; 
+
+            for(let row=1; row<=5; row++) {
+                for(let col=0; col<5; col++) {
+                    const cell = document.createElement('button');
+                    cell.className = 'cell';
+                    cell.textContent = row * 100 * currentRound;
+                    cell.onclick = () => { if(!isProcessing) startChallenge(row * 100, row * 100 * currentRound, cell); };
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function startChallenge(basePoints, actualPoints, cell) {
+            isProcessing = true; cell.classList.add('disabled'); cell.disabled = true;
+            boxesInRound++;
+
+            if(availableForCorrect.length === 0) availableForCorrect = [...fullWordPool];
+            const wordIdx = Math.floor(Math.random() * availableForCorrect.length);
+            const word = availableForCorrect.splice(wordIdx, 1)[0];
+
+            let q = "", ans = word.w, typeLabel = "";
+
+            // LOGIC RE-DISTRIBUTED BY DIFFICULTY
+            if (basePoints <= 200) {
+                if (Math.random() > 0.5) {
+                    q = `Match the symbol: ${word.s}`;
+                    typeLabel = "SYMBOL (EASY)";
+                } else {
+                    q = `English for: "${word.h}"`;
+                    typeLabel = "TRANSLATION (EASY)";
+                }
+            } else if (basePoints <= 400) {
+                q = `Which word means: "${word.d}"?`;
+                typeLabel = "DEFINITION (MEDIUM)";
+            } else {
+                q = `Context: "${word.f.replace(word.w, '_______')}"`;
+                typeLabel = "CONTEXT (HARD)";
+            }
+
+            document.getElementById('question-header').innerText = `${typeLabel} FOR ${actualPoints}`;
+            document.getElementById('question-text').innerText = q;
+
+            // Distractors ONLY from the provided list
+            let distPool = fullWordPool.filter(w => w.w !== word.w);
+            let distractors = [];
+            for(let i=0; i<3; i++) {
+                let rIdx = Math.floor(Math.random() * distPool.length);
+                distractors.push(distPool.splice(rIdx, 1)[0].w);
+            }
+
+            const choices = [ans, ...distractors].sort(() => 0.5 - Math.random());
+            const oG = document.getElementById('options-grid'); oG.innerHTML = '';
+
+            choices.forEach(ch => {
+                const b = document.createElement('button'); b.className = 'option-btn'; b.textContent = ch;
+                b.onclick = () => {
+                    const banner = document.getElementById('result-banner');
+                    if(ch === ans) { 
+                        b.classList.add('correct'); banner.innerText = "CORRECT!"; banner.style.color = "var(--success)"; playSound('win'); spawnBalloons(10);
+                        const scoreEl = document.getElementById(`score-${currentTeam}`);
+                        scoreEl.textContent = parseInt(scoreEl.textContent) + actualPoints;
+                    } else { 
+                        b.classList.add('wrong'); banner.innerText = "WRONG!"; banner.style.color = "var(--danger)"; playSound('lose'); 
+                    }
+                    banner.style.display = 'block';
+                    setTimeout(() => {
+                        banner.style.display = 'none'; document.getElementById('overlay').style.display = 'none';
+                        currentTeam = (currentTeam + 1) % 4;
+                        updateUI();
+                        
+                        if(boxesInRound === 25) {
+                            if(currentRound === 1) startRoundTwo();
+                            else checkGameEnd();
+                        }
+                        isProcessing = false;
+                    }, 2000);
+                };
+                oG.appendChild(b);
+            });
+            document.getElementById('overlay').style.display = 'flex';
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.team-box').forEach((box, i) => {
+                box.classList.toggle('active', i === currentTeam);
+            });
+            document.getElementById('turn-display').textContent = `TEAM ${currentTeam + 1}'S TURN`;
+        }
+
+        function startRoundTwo() {
+            currentRound = 2;
+            document.getElementById('round-indicator').innerText = "ROUND 2: DOUBLE POINTS!";
+            const banner = document.getElementById('result-banner');
+            banner.innerHTML = "BOARD CLEARED!<br>ROUND 2: DOUBLE POINTS";
+            banner.style.color = "var(--secondary)";
+            banner.style.display = "block";
+            setTimeout(() => {
+                banner.style.display = "none";
+                initGrid();
+            }, 3500);
+        }
+
+        function checkGameEnd() {
+            const labels = document.querySelectorAll('.team-label');
+            let scores = [0,1,2,3].map(i => ({name: labels[i].innerText, val: parseInt(document.getElementById(`score-${i}`).textContent)}));
+            scores.sort((a,b) => b.val - a.val);
+            document.getElementById('result-banner').innerHTML = `GAME OVER!<br>${scores[0].name.toUpperCase()} WINS!<br>${scores[0].val} POINTS`;
+            document.getElementById('result-banner').style.color = "var(--secondary)";
+            document.getElementById('result-banner').style.display = "block";
+            spawnBalloons(70);
+        }
+
+        initGrid();
+    </script>
+</body>
+</html>
